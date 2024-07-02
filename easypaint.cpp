@@ -65,7 +65,7 @@ public:
         }
 
         // 创建窗口
-        window = SDL_CreateWindow("EasyPaint 1.0",
+        window = SDL_CreateWindow("EasyPaint 1.1",
                                   SDL_WINDOWPOS_UNDEFINED,
                                   SDL_WINDOWPOS_UNDEFINED,
                                   1920, 1080,
