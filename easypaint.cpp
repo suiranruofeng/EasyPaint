@@ -54,6 +54,28 @@ private:
     SDL_Renderer* renderer;
 };
 
+//橡皮类
+class Eraser {
+public:
+    Eraser(int x, int y, int radius, SDL_Renderer* renderer)
+        : x(x), y(y), radius(radius), renderer(renderer) {}
+
+    void draw() {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        for (int i = -radius; i <= radius; i++) {
+            for (int j = -radius; j <= radius; j++) {
+                if (i * i + j * j <= radius * radius) {
+                    SDL_RenderDrawPoint(renderer, x + i, y + j);
+                }
+            }
+        }
+    }
+
+private:
+    int x, y, radius;
+    SDL_Renderer* renderer;
+};
+
 //绘图类
 class LineDrawingApp {
 public:
@@ -92,102 +114,128 @@ public:
     currentColor = 0;
     }
 
-    void run() {
-        bool running = true;
-        bool isDrawing = false;
-        bool isDrawingStraightLine = false;
-        Line* currentLine = NULL;
-        int startX = 0, startY = 0;
 
+void run() {
+    bool running = true;
+    bool isDrawing = false;
+    bool isDrawingStraightLine = false;
+    bool isDrawingEraser = false;
+    Line* currentLine = nullptr;
+    int startX = 0, startY = 0;
+    int eraserRadius = 20; // 橡皮擦半径
+    std::vector<Eraser*> erasers;
 
-        while (running) {
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) {
-                    running = false;
-                }
-                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e) {
-                    // 按下 'e' 键清空画布
-                    lines.clear();
-                    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);//保持白色
-                    SDL_RenderClear(renderer);
-                    SDL_RenderPresent(renderer);
-                }
-                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r) {
-                    // 切换颜色
-                    currentColor = (currentColor + 1) % 4;
-                }
-                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q) {
-                    // 按下 'q' 键退出程序
-                    running = false;
-                }
-                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s) {
-                // 按下 's' 键保存当前绘图
+    while (running) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                running = false;
+            }
+            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_x) {
+                // 按下 'x' 键清空画布
+                lines.clear();
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);//保持白色
+                SDL_RenderClear(renderer);
+                SDL_RenderPresent(renderer);
+            }
+            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r) {
+                // r切换颜色
+                currentColor = (currentColor + 1) % 4;
+            }
+            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q) {
+                // 按下 'q' 键退出程序
+                running = false;
+            }
+            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s) {
+            // 按下 's' 键保存当前绘图
                 saveDrawing();
-                }
-                else if (event.type == SDL_MOUSEBUTTONDOWN) {
-                    if (event.button.button == SDL_BUTTON_LEFT) {
-                        // 鼠标左键按下时开始绘制自由线条
+            }
+            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_e) {
+                isDrawingEraser = !isDrawingEraser;
+            }
+            else if (event.type == SDL_MOUSEBUTTONDOWN) {
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    if (isDrawingEraser) {
+                        erasers.push_back(new Eraser(event.button.x, event.button.y, eraserRadius, renderer));
+                    } else {
                         isDrawing = true;
                         currentLine = new FreeLine(renderer, colorOptions[currentColor][0], colorOptions[currentColor][1], colorOptions[currentColor][2]);
                         static_cast<FreeLine*>(currentLine)->addPoint(event.button.x, event.button.y);
                     }
-                    else if (event.button.button == SDL_BUTTON_RIGHT) {
-                        // 鼠标右键按下时开始绘制直线
+                }
+                else if (event.button.button == SDL_BUTTON_RIGHT) {
+                    if (isDrawingEraser) {
+                        erasers.push_back(new Eraser(event.button.x, event.button.y, eraserRadius, renderer));
+                    } else {
                         isDrawingStraightLine = true;
                         startX = event.button.x;
                         startY = event.button.y;
+                        currentLine = new StraightLine(startX, startY, event.button.x, event.button.y, renderer, colorOptions[currentColor][0], colorOptions[currentColor][1], colorOptions[currentColor][2]);
                     }
                 }
-                else if (event.type == SDL_MOUSEMOTION && isDrawing) {
-                    // 鼠标移动时更新自由线条
-                    static_cast<FreeLine*>(currentLine)->addPoint(event.motion.x, event.motion.y);
-                    // 清空画布并重新绘制所有线条
+            }
+            else if (event.type == SDL_MOUSEMOTION && isDrawing) {
+                static_cast<FreeLine*>(currentLine)->addPoint(event.motion.x, event.motion.y);
+                // 清空画布并重新绘制所有线条和橡皮擦
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                SDL_RenderClear(renderer);
+                for (Line* line : lines) {
+                    line->draw();
+                }
+                for (Eraser* eraser : erasers) {
+                    eraser->draw();
+                }
+                if (currentLine) {
+                    currentLine->draw();
+                }
+                SDL_RenderPresent(renderer);
+            }
+            else if (event.type == SDL_MOUSEBUTTONUP) {
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    isDrawing = false;
+                    static_cast<FreeLine*>(currentLine)->addPoint(event.button.x, event.button.y);
+                    lines.push_back(currentLine);
+                    currentLine = nullptr;
+                }
+                else if (event.button.button == SDL_BUTTON_RIGHT) {
+                    isDrawingStraightLine = false;
+                    lines.push_back(new StraightLine(startX, startY, event.button.x, event.button.y, renderer, colorOptions[currentColor][0], colorOptions[currentColor][1], colorOptions[currentColor][2]));
+                    // 清空画布并重新绘制所有线条和橡皮擦
                     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
                     SDL_RenderClear(renderer);
-                    for (size_t i = 0; i < lines.size(); i++) {
-                        lines[i]->draw();
+                    for (Line* line : lines) {
+                        line->draw();
                     }
-                    if (currentLine) {
-                        currentLine->draw();
+                    for (Eraser* eraser : erasers) {
+                        eraser->draw();
                     }
                     SDL_RenderPresent(renderer);
-                }
-                else if (event.type == SDL_MOUSEBUTTONUP) {
-                    if (event.button.button == SDL_BUTTON_LEFT) {
-                        // 鼠标左键释放时结束自由线条绘制
-                        isDrawing = false;
-                        static_cast<FreeLine*>(currentLine)->addPoint(event.button.x, event.button.y);
-                        lines.push_back(currentLine);
-                        currentLine = NULL;
-                    }
-                    else if (event.button.button == SDL_BUTTON_RIGHT) {
-                        // 鼠标右键释放时结束直线绘制
-                        isDrawingStraightLine = false;
-                        lines.push_back(new StraightLine(startX, startY, event.button.x, event.button.y, renderer, colorOptions[currentColor][0], colorOptions[currentColor][1], colorOptions[currentColor][2]));
-                        // 清空画布并重新绘制所有线条
-                        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-                        SDL_RenderClear(renderer);
-                        for (size_t i = 0; i < lines.size(); i++) {
-                            lines[i]->draw();
-                        }
-                        SDL_RenderPresent(renderer);
-                    }
                 }
             }
         }
 
-        // 清理资源
-        for (size_t i = 0; i < lines.size(); i++) {
-            delete lines[i];
+        // 渲染所有橡皮擦
+        for (Eraser* eraser : erasers) {
+            eraser->draw();
         }
-        if (currentLine) {
-            delete currentLine;
-        }
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
+
+        SDL_RenderPresent(renderer);
     }
+
+    // 清理资源
+    for (Line* line : lines) {
+        delete line;
+    }
+    for (Eraser* eraser : erasers) {
+        delete eraser;
+    }
+    if (currentLine) {
+        delete currentLine;
+    }
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+}
 
     void saveDrawing(); // 保存函数
 
