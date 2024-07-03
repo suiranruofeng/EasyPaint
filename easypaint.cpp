@@ -121,6 +121,10 @@ public:
                     // 按下 'q' 键退出程序
                     running = false;
                 }
+                else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_s) {
+                // 按下 's' 键保存当前绘图
+                saveDrawing();
+                }
                 else if (event.type == SDL_MOUSEBUTTONDOWN) {
                     if (event.button.button == SDL_BUTTON_LEFT) {
                         // 鼠标左键按下时开始绘制自由线条
@@ -185,6 +189,8 @@ public:
         SDL_Quit();
     }
 
+    void saveDrawing(); // 保存函数
+
 private:
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -204,6 +210,25 @@ const int LineDrawingApp::colorOptions[][3] = {
     {0, 0, 255}   // 蓝色
 };
 
+void LineDrawingApp::saveDrawing() {
+    std::string fileName = "output.bmp";//文件名
+
+    // 创建一个临时的 SDL_Surface 来存储绘图
+    SDL_Surface* surface = SDL_CreateRGBSurface(0, 1920, 1080, 32, 0, 0, 0, 0);
+
+
+    // 将渲染器的内容复制到 SDL_Surface
+    SDL_RenderReadPixels(renderer, nullptr, surface->format->format, surface->pixels, surface->pitch);
+
+    // 保存 SDL_Surface 到文件
+    SDL_SaveBMP(surface, fileName.c_str());
+
+    // 释放 SDL_Surface
+    SDL_FreeSurface(surface);
+}
+
+
+// 主函数
 int main(int argc, char *argv[]) {
     LineDrawingApp app;
     app.run();
